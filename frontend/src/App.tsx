@@ -11,16 +11,17 @@ export default function App() {
     setIsLoading(true);
 
     const formData = new FormData();
-    formData.append("picture", pictureBlob);
+    formData.append("image", pictureBlob);
     formData.append("audio", audioBlob);
+    console.log(pictureBlob, audioBlob);
 
-    axios.post("localhost:3000/master", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    }).then(() => {
-
-    });
+    axios
+      .post("http://localhost:3000/master", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      })
+      .then((resp) => console.log(resp));
 
     setIsLoading(false);
   };
