@@ -18,6 +18,73 @@ app.use(cors());
 const upload = multer();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Function to transcribe audio
+async function transcribeAudio(audioBuffer) {
+  const tempFilePathMp3 = join(__dirname, `recording-${Date.now()}.mp3`);
+  fs.writeFileSync(tempFilePathMp3, audioBuffer);
+
+  try {
+    const transcription = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(tempFilePathMp3),
+      model: "whisper-1",
+    });
+    fs.unlinkSync(tempFilePathMp3);
+    console.log("Transcript: " + transcription.text);
+    return transcription.text;
+  } catch (audioError) {
+    console.error("Audio transcription error (MP3):", audioError);
+    fs.unlinkSync(tempFilePathMp3); // Clean up mp3 file
+
+    // Try again with WAV format
+    const tempFilePathWav = join(__dirname, `recording-${Date.now()}.wav`);
+    fs.writeFileSync(tempFilePathWav, audioBuffer);
+    try {
+      const transcription = await openai.audio.transcriptions.create({
+        file: fs.createReadStream(tempFilePathWav),
+        model: "whisper-1",
+      });
+      fs.unlinkSync(tempFilePathWav);
+      console.log("Transcript (WAV attempt): " + transcription.text);
+      return transcription.text;
+    } catch (secondError) {
+      console.error(
+        "Second audio transcription attempt failed (WAV):",
+        secondError
+      );
+      fs.unlinkSync(tempFilePathWav); // Clean up wav file
+      // Re-throw the original error or a combined error if needed
+      throw new Error("Audio transcription failed after multiple attempts.");
+    }
+  }
+}
+
+// Function to describe image
+async function describeImage(imageBuffer, mimetype) {
+  const base64Image = `data:${mimetype};base64,${imageBuffer.toString(
+    "base64"
+  )}`;
+  const imageResponse = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Describe this image in detail." },
+          {
+            type: "image_url",
+            image_url: {
+              url: base64Image,
+            },
+          },
+        ],
+      },
+    ],
+    max_tokens: 300, // Optional: constrain token usage if needed
+  });
+  console.log("Image Description:", imageResponse.choices[0].message.content);
+  return imageResponse.choices[0].message.content;
+}
+
 // Serve static files from the root directory
 app.use(express.static(__dirname));
 
@@ -37,74 +104,17 @@ app.post(
           .json({ error: "Both audio and image files are required" });
       }
 
-      // Step 2: Transcribe audio
       const audioBuffer = req.files.audio[0].buffer;
-      const tempFilePath = join(__dirname, "recording.mp3");
-      fs.writeFileSync(tempFilePath, audioBuffer);
-
-      let transcript;
-      try {
-        const transcription = await openai.audio.transcriptions.create({
-          file: fs.createReadStream(tempFilePath),
-          model: "whisper-1",
-        });
-        transcript = transcription.text;
-        console.log("Transcript: " + transcript);
-        fs.unlinkSync(tempFilePath);
-      } catch (audioError) {
-        console.error("Audio transcription error:", audioError);
-
-        // Try again with different file extension if first attempt failed
-        if (tempFilePath.endsWith("mp3")) {
-          const wavPath = join(__dirname, "recording.wav");
-          fs.writeFileSync(wavPath, audioBuffer);
-
-          try {
-            const transcription = await openai.audio.transcriptions.create({
-              file: fs.createReadStream(wavPath),
-              model: "whisper-1",
-            });
-            transcript = transcription.text;
-            fs.unlinkSync(wavPath);
-          } catch (secondError) {
-            console.error("Second attempt failed:", secondError);
-            fs.unlinkSync(wavPath);
-            throw audioError;
-          }
-        } else {
-          throw audioError;
-        }
-      }
-
-      // Step 3: Process image
       const imageBuffer = req.files.image[0].buffer;
-      const base64Image = `data:${
-        req.files.image[0].mimetype
-      };base64,${imageBuffer.toString("base64")}`;
+      const imageMimetype = req.files.image[0].mimetype;
 
-      const imageResponse = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Describe this image in detail." },
-              {
-                type: "image_url",
-                image_url: {
-                  url: base64Image,
-                },
-              },
-            ],
-          },
-        ],
-      });
+      // Step 2 & 3: Transcribe audio and process image in parallel
+      const [transcript, imageDescription] = await Promise.all([
+        transcribeAudio(audioBuffer),
+        describeImage(imageBuffer, imageMimetype),
+      ]);
 
-      const imageDescription = imageResponse.choices[0].message.content;
-
-      // Step 4: Summarize combined information
-      const combinedInput = `Audio transcript: ${transcript}\n\nImage description: ${imageDescription}`;
-
+      // Step 4: Generate summary based on transcript and image description
       const summaryResponse = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [

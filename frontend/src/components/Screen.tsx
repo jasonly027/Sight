@@ -46,22 +46,30 @@ export default function Screen({ onCapture }: ScreenProps) {
   }, []);
 
   const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
+    null
+  );
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
+      console.log("THE RECORDER MIME TYPE: " + recorder.mimeType);
       const chunks: BlobPart[] = [];
 
       recorder.ondataavailable = (e) => chunks.push(e.data);
       recorder.onstop = async () => {
-        const audioBlob = new Blob(chunks, { type: "audio/webm" });
+        const audioBlob = new Blob(chunks);
+        console.log("THE AUDIO BLOB MIME TYPE: " + audioBlob.type);
         const pictureBlob = await takePicture();
         onCapture(pictureBlob, audioBlob);
       };
+      console.log(
+        "MEDIA RECORDER SUPPORTED OR NOT???: " +
+          MediaRecorder.isTypeSupported("audio/mp4")
+      );
 
-      recorder.start();
+      recorder.start(1000);
       setMediaRecorder(recorder);
       setIsRecording(true);
     } catch (err) {
@@ -101,11 +109,8 @@ export default function Screen({ onCapture }: ScreenProps) {
               className="size-full"
               onClick={toggleRecording}
             />
-            <canvas
-              ref={canvasRef}
-              className="hidden"
-            ></canvas>
-            
+            <canvas ref={canvasRef} className="hidden"></canvas>
+
             <button
               onClick={toggleRecording}
               className={`
@@ -118,7 +123,11 @@ export default function Screen({ onCapture }: ScreenProps) {
       `}
               aria-label={isRecording ? "Stop Recording" : "Start Recording"}
             >
-              {isRecording ? <Mic className="w-8 h-8 text-white" /> : <MicOff className="w-8 h-8 text-white" />}
+              {isRecording ? (
+                <Mic className="w-8 h-8 text-white" />
+              ) : (
+                <MicOff className="w-8 h-8 text-white" />
+              )}
               <style>{`
         @keyframes pulse {
           0% {
