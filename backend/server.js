@@ -229,11 +229,11 @@ app.post(
         messages: [
           {
             role: "system",
-            content: "You are a helpful summarization assistant.",
+            content: `You are a helpful assistant designed specifically for a blind user. Your primary goal is to interpret audio and visual information to describe their immediate surroundings clearly, concisely, and accurately. Prioritize information crucial for awareness, orientation, and safety. Use simple, direct language. When applicable, provide directional cues relative to the user if inferrable.`,
           },
           {
             role: "user",
-            content: `Summarize the following combined audio and image information:\n\n${combinedInput}`,
+            content: `Synthesize the information from the audio transcript and the image description below to provide a brief, informative update about the user's current environment. Highlight key objects, people, or potential hazards.\n\nAudio Transcript:\n${transcript}\n\nImage Description:\n${imageDescription}`,
           },
         ],
       });
