@@ -106,4 +106,41 @@ app.post("/tts", async (req, res) => {
   res.send(Buffer.from(arrayBuffer));
 });
 
+app.use(express.json());
+
+app.post("/image-classifier", async (req, res) => {
+  try {
+    const { img } = req.body;
+
+    if (!img) {
+      return res.status(400).json({ error: "No image data provided" });
+    }
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Describe this image in detail." },
+            {
+              type: "image_url",
+              image_url: {
+                url: img,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    res.json({
+      description: response.choices[0].message.content,
+    });
+  } catch (error) {
+    console.error("Image classification error:", error);
+    res.status(500).json({ error: "Error processing image classification" });
+  }
+});
+
 app.listen(3000, () => console.log("Server running on port 3000"));
