@@ -1,30 +1,37 @@
 import { useState } from "react";
-import CameraView from "./components/CameraView";
-import RecordButton from "./components/RecordButton";
 import ResponseBox from "./components/ResponseBox";
+import Screen from "./components/Screen";
+import axios from "axios";
 
 export default function App() {
-  const [response, setResponse] = useState('');
+  const [response, setResponse] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  
-  const handleRecordingComplete = async (audioBlob: Blob) => {
+
+  const onCapture = (pictureBlob: Blob, audioBlob: Blob) => {
     setIsLoading(true);
-    // Here you would implement the logic to:
-    // 1. Send the audio recording to speech-to-text
-    // 2. Process the camera feed with computer vision
-    // 3. Generate a response
-    // For now, we'll just show a placeholder response
-    setTimeout(() => {
-      setResponse("I can see what appears to be your surroundings. Feel free to ask specific questions about what you see.");
-      setIsLoading(false);
-    }, 1500);
+
+    const formData = new FormData();
+    formData.append("picture", pictureBlob);
+    formData.append("audio", audioBlob);
+
+    axios.post("localhost:3000/master", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }).then(() => {
+
+    });
+
+    setIsLoading(false);
   };
-  
+
   return (
     <div className="fixed inset-0 bg-slate-900">
-      <CameraView />
-      <RecordButton onRecordingComplete={handleRecordingComplete} />
-      <ResponseBox text={response} isLoading={isLoading} />
+      <Screen onCapture={onCapture} />
+      <ResponseBox
+        text={response}
+        isLoading={isLoading}
+      />
     </div>
   );
 }

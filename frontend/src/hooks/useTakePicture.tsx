@@ -1,16 +1,25 @@
-import { DispatchWithoutAction, RefObject, useCallback } from "react";
+import { RefObject, useCallback } from "react";
 
 export default function useTakePicture(
   videoRef: RefObject<HTMLVideoElement | null>,
   canvasRef: RefObject<HTMLCanvasElement | null>
-): DispatchWithoutAction {
-  const takeScreenshot = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return;
+): () => Promise<Blob> {
+  const takeScreenshot = useCallback(async (): Promise<Blob> => {
+    if (!videoRef.current || !canvasRef.current) return Promise.reject("ref parameters are null");
 
     const ctx = canvasRef.current.getContext("2d");
-    
+
     ctx?.drawImage(videoRef.current, 0, 0);
-    console.log(canvasRef.current.toDataURL("image/png"));
+
+    return new Promise((resolve, reject) => {
+      canvasRef.current?.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject("Failed to create blob");
+        }
+      });
+    });
   }, [canvasRef, videoRef]);
 
   return takeScreenshot;

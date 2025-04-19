@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import useTakePicture from "../hooks/useTakePicture";
 
-export default function CameraView() {
+interface CameraViewProps {
+  onPictureTaken: (picture: Blob) => void;
+}
+
+export default function CameraView({ onPictureTaken }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -53,7 +57,10 @@ export default function CameraView() {
             autoPlay
             playsInline
             className="size-full"
-            onClick={takePicture}
+            onClick={async () => {
+              const blob = await takePicture();
+              onPictureTaken(blob);
+            }}
           />
           <canvas
             ref={canvasRef}
