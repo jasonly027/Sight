@@ -21,6 +21,8 @@
 
 <h2 id="demo">📹 Demo</h2>
 
+https://www.youtube.com/watch?v=yALl1WAc5U0
+
 <h2 id="contrib">👥 Contributors</h2>
 
 - [Sanskar Thapa](https://github.com/sskarz)
