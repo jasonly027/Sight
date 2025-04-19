@@ -46,22 +46,30 @@ export default function Screen({ onCapture }: ScreenProps) {
   }, []);
 
   const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
+    null
+  );
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
+      console.log("THE RECORDER MIME TYPE: " + recorder.mimeType);
       const chunks: BlobPart[] = [];
 
       recorder.ondataavailable = (e) => chunks.push(e.data);
       recorder.onstop = async () => {
-        const audioBlob = new Blob(chunks, { type: "audio/webm" });
+        const audioBlob = new Blob(chunks);
+        console.log("THE AUDIO BLOB MIME TYPE: " + audioBlob.type);
         const pictureBlob = await takePicture();
         onCapture(pictureBlob, audioBlob);
       };
+      console.log(
+        "MEDIA RECORDER SUPPORTED OR NOT???: " +
+          MediaRecorder.isTypeSupported("audio/mp4")
+      );
 
-      recorder.start();
+      recorder.start(1000);
       setMediaRecorder(recorder);
       setIsRecording(true);
     } catch (err) {
@@ -101,19 +109,41 @@ export default function Screen({ onCapture }: ScreenProps) {
               className="size-full"
               onClick={toggleRecording}
             />
-            <canvas
-              ref={canvasRef}
-              className="hidden"
-            ></canvas>
+            <canvas ref={canvasRef} className="hidden"></canvas>
+
             <button
-              className="fixed bottom-8 left-1/2 -translate-x-1/2 z-10 w-16 h-16 rounded-full bg-purple-500 hover:bg-purple-600 flex items-center justify-center shadow-lg transition-colors"
+              onClick={toggleRecording}
+              className={`
+        fixed bottom-8 left-1/2 -translate-x-1/2 z-10 
+        w-16 h-16 rounded-full 
+        bg-purple-500 hover:bg-purple-600 
+        flex items-center justify-center 
+        shadow-lg transition-colors
+        ${isRecording ? "pulse-recording" : ""}
+      `}
               aria-label={isRecording ? "Stop Recording" : "Start Recording"}
             >
               {isRecording ? (
-                <MicOff className="w-8 h-8 text-white" />
-              ) : (
                 <Mic className="w-8 h-8 text-white" />
+              ) : (
+                <MicOff className="w-8 h-8 text-white" />
               )}
+              <style>{`
+        @keyframes pulse {
+          0% {
+            box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7);
+          }
+          70% {
+            box-shadow: 0 0 0 15px rgba(168, 85, 247, 0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(168, 85, 247, 0);
+          }
+        }
+        .pulse-recording {
+          animation: pulse 2s infinite;
+        }
+      `}</style>
             </button>
           </>
         )}

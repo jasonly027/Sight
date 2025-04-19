@@ -3,6 +3,7 @@ import express from "express";
 import multer from "multer";
 import OpenAI from "openai";
 import fs from "fs";
+import https from "https";
 import * as dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -18,133 +19,75 @@ app.use(cors());
 const upload = multer();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Needed for Yolo: Spawns a shell and runes a command within that shell
-import { exec } from 'child_process';
-import path from "path"; 
+// Function to transcribe audio
+async function transcribeAudio(audioBuffer) {
+  const tempFilePathMp3 = join(__dirname, `recording-${Date.now()}.mp3`);
+  fs.writeFileSync(tempFilePathMp3, audioBuffer);
+
+  try {
+    const transcription = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(tempFilePathMp3),
+      model: "whisper-1",
+    });
+    fs.unlinkSync(tempFilePathMp3);
+    console.log("Transcript: " + transcription.text);
+    return transcription.text;
+  } catch (audioError) {
+    console.error("Audio transcription error (MP3):", audioError);
+    fs.unlinkSync(tempFilePathMp3); // Clean up mp3 file
+
+    // Try again with WAV format
+    const tempFilePathWav = join(__dirname, `recording-${Date.now()}.wav`);
+    fs.writeFileSync(tempFilePathWav, audioBuffer);
+    try {
+      const transcription = await openai.audio.transcriptions.create({
+        file: fs.createReadStream(tempFilePathWav),
+        model: "whisper-1",
+      });
+      fs.unlinkSync(tempFilePathWav);
+      console.log("Transcript (WAV attempt): " + transcription.text);
+      return transcription.text;
+    } catch (secondError) {
+      console.error(
+        "Second audio transcription attempt failed (WAV):",
+        secondError
+      );
+      fs.unlinkSync(tempFilePathWav); // Clean up wav file
+      // Re-throw the original error or a combined error if needed
+      throw new Error("Audio transcription failed after multiple attempts.");
+    }
+  }
+}
+
+// Function to describe image
+async function describeImage(imageBuffer, mimetype) {
+  const base64Image = `data:${mimetype};base64,${imageBuffer.toString(
+    "base64"
+  )}`;
+  const imageResponse = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "Describe this image in detail." },
+          {
+            type: "image_url",
+            image_url: {
+              url: base64Image,
+            },
+          },
+        ],
+      },
+    ],
+    max_tokens: 300, // Optional: constrain token usage if needed
+  });
+  console.log("Image Description:", imageResponse.choices[0].message.content);
+  return imageResponse.choices[0].message.content;
+}
 
 // Serve static files from the root directory
 app.use(express.static(__dirname));
-
-// app.post("/transcribe", upload.single("audio"), async (req, res) => {
-//   try {
-//     if (!req.file) {
-//       return res.status(400).json({ error: "No audio file provided" });
-//     }
-
-//     // Create a temp file from buffer with a .mp3 extension (OpenAI handles this better)
-//     const tempFilePath = join(__dirname, "recording.mp3");
-//     fs.writeFileSync(tempFilePath, req.file.buffer);
-
-//     console.log(
-//       `Sending file: ${tempFilePath} (${req.file.mimetype}, ${req.file.size} bytes)`
-//     );
-
-//     try {
-//       const transcription = await openai.audio.transcriptions.create({
-//         file: fs.createReadStream(tempFilePath),
-//         model: "whisper-1",
-//       });
-
-//       // Clean up the temp file
-//       fs.unlinkSync(tempFilePath);
-
-//       res.json({ transcript: transcription.text });
-//     } catch (apiError) {
-//       console.error("OpenAI API Error:", apiError);
-
-//       // Try again with different file extension if first attempt failed
-//       if (tempFilePath.endsWith("mp3")) {
-//         const wavPath = join(__dirname, "recording.wav");
-//         fs.writeFileSync(wavPath, req.file.buffer);
-
-//         try {
-//           const transcription = await openai.audio.transcriptions.create({
-//             file: fs.createReadStream(wavPath),
-//             model: "whisper-1",
-//           });
-
-//           fs.unlinkSync(wavPath);
-//           return res.json({ transcript: transcription.text });
-//         } catch (secondError) {
-//           console.error("Second attempt failed:", secondError);
-//           fs.unlinkSync(wavPath);
-//           throw apiError; // Throw original error
-//         }
-//       } else {
-//         throw apiError;
-//       }
-//     }
-//   } catch (error) {
-//     console.error("Transcription error:", error);
-//     res.status(500).json({ error: "Error processing audio transcription" });
-//   }
-// });
-
-// app.use(express.json());
-
-// app.post("/summarize", async (req, res) => {
-//   const { transcript } = req.body;
-//   const completion = await openai.chat.completions.create({
-//     model: "gpt-4o-mini",
-//     messages: [
-//       { role: "system", content: "You are a helpful summarization assistant." },
-//       { role: "user", content: `Summarize the following:\n\n${transcript}` },
-//     ],
-//   });
-//   res.json({ summary: completion.choices[0].message.content });
-// });
-
-// app.post("/tts", async (req, res) => {
-//   const { text } = req.body;
-
-//   // 1. Call OpenAI TTS API
-//   const ttsResponse = await openai.audio.speech.create({
-//     model: "tts-1", // real‑time model :contentReference[oaicite:7]{index=7}
-//     input: text,
-//     voice: "alloy", // choose any supported voice
-//     format: "mp3",
-//   });
-
-//   // 2. Stream MP3 back to client
-//   res.set("Content-Type", "audio/mpeg");
-//   const arrayBuffer = await ttsResponse.arrayBuffer();
-//   res.send(Buffer.from(arrayBuffer));
-// });
-
-// app.post("/image-classifier", async (req, res) => {
-//   try {
-//     const { img } = req.body;
-
-//     if (!img) {
-//       return res.status(400).json({ error: "No image data provided" });
-//     }
-
-//     const response = await openai.chat.completions.create({
-//       model: "gpt-4o",
-//       messages: [
-//         {
-//           role: "user",
-//           content: [
-//             { type: "text", text: "Describe this image in detail." },
-//             {
-//               type: "image_url",
-//               image_url: {
-//                 url: img,
-//               },
-//             },
-//           ],
-//         },
-//       ],
-//     });
-
-//     res.json({
-//       description: response.choices[0].message.content,
-//     });
-//   } catch (error) {
-//     console.error("Image classification error:", error);
-//     res.status(500).json({ error: "Error processing image classification" });
-//   }
-// });
 
 // New master endpoint that combines all functionalities
 app.post(
@@ -162,118 +105,23 @@ app.post(
           .json({ error: "Both audio and image files are required" });
       }
 
-      // Step 2: Transcribe audio
       const audioBuffer = req.files.audio[0].buffer;
-      const tempFilePath = join(__dirname, "recording.mp3");
-      fs.writeFileSync(tempFilePath, audioBuffer);
-
-      let transcript;
-      try {
-        const transcription = await openai.audio.transcriptions.create({
-          file: fs.createReadStream(tempFilePath),
-          model: "whisper-1",
-        });
-        transcript = transcription.text;
-        fs.unlinkSync(tempFilePath);
-      } catch (audioError) {
-        console.error("Audio transcription error:", audioError);
-
-        // Try again with different file extension if first attempt failed
-        if (tempFilePath.endsWith("mp3")) {
-          const wavPath = join(__dirname, "recording.wav");
-          fs.writeFileSync(wavPath, audioBuffer);
-
-          try {
-            const transcription = await openai.audio.transcriptions.create({
-              file: fs.createReadStream(wavPath),
-              model: "whisper-1",
-            });
-            transcript = transcription.text;
-            fs.unlinkSync(wavPath);
-          } catch (secondError) {
-            console.error("Second attempt failed:", secondError);
-            fs.unlinkSync(wavPath);
-            throw audioError;
-          }
-        } else {
-          throw audioError;
-        }
-      }
-
-      // Step 3: Process image
       const imageBuffer = req.files.image[0].buffer;
-      const base64Image = `data:${
-        req.files.image[0].mimetype
-      };base64,${imageBuffer.toString("base64")}`;
+      const imageMimetype = req.files.image[0].mimetype;
 
-      const imageResponse = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Describe this image in detail." },
-              {
-                type: "image_url",
-                image_url: {
-                  url: base64Image,
-                },
-              },
-            ],
-          },
-        ],
-      });
+      // Step 2 & 3: Transcribe audio and process image in parallel
+      const [transcript, imageDescription] = await Promise.all([
+        transcribeAudio(audioBuffer),
+        describeImage(imageBuffer, imageMimetype),
+      ]);
 
-
-      const imageDescription = imageResponse.choices[0].message.content;
-
-      //Step YOLO Process
-      const imagePath = join(__dirname, "uploads.png"); // temp image file path
-      fs.writeFileSync(imagePath, imageBuffer);
-      console.log("\nTHE IMAGE" + imagePath);
-      console.log("MIME" + req.files.image[0].mimetype  + '\n');
-      //const paths = path.toString; //relatuinve path
-      const yoloModel = path.join(__dirname, "yolov5", "detect.py"); //making the actual path
-      const command = `python  ${yoloModel} --save-txt --weights yolov5s.pt --source ${imagePath} --view-img`;
-      await runYolo(command)
-      let yoloResult = 'nothing';
-      //const yoloFile = '../yolov5/runs/detect/exp/labels/upload.txt';
-      const yoloFile = path.join(__dirname, "yolov5", "runs" ,"detect", "exp", "labels", "uploads.txt");
-      fs.readFile(yoloFile, 'utf8', (err, data) => {
-      if (err) {
-        console.error("Failed to read file:", err);
-        return;
-      }
-          yoloResult = data;
-          console.log("\n\n YOLO RESULT: " + yoloResult + "\n");
-        });
-      fs.unlinkSync(imagePath); //delete the image
-      const yoloFile2 = path.join(__dirname, "yolov5", "runs" ,"detect", "exp");
-      const deleteFolderRecursive = (folderPath) => {
-      if (fs.existsSync(folderPath)) {
-        fs.readdirSync(folderPath).forEach((file) => {
-          const curPath = path.join(folderPath, file);
-          if (fs.lstatSync(curPath).isDirectory()) {
-            deleteFolderRecursive(curPath); // recurse
-          } else {
-            fs.unlinkSync(curPath); // delete file
-          }
-        });
-        fs.rmdirSync(folderPath); // delete now-empty folder
-      }
-    };
-
-    deleteFolderRecursive(yoloFile2);
-
-      // Step 4: Summarize combined information
-      const combinedInput = `Audio transcript: ${transcript}\n\nImage description: ${imageDescription}`;
-
+      // Step 4: Generate summary based on transcript and image description
       const summaryResponse = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
-              content: `You are a helpful assistant designed specifically for a blind user. Your primary goal is to interpret audio and visual information to describe their immediate surroundings clearly, concisely, and accurately. Prioritize information crucial for awareness, orientation, and safety. Use simple, direct language. When applicable, provide directional cues relative to the user if inferrable.`,
+            content: `You are a helpful assistant designed specifically for a blind user. Your primary goal is to interpret audio and visual information to describe their immediate surroundings clearly, concisely, and accurately. Prioritize information crucial for awareness, orientation, and safety. Use simple, direct language. When applicable, provide directional cues relative to the user if inferrable. Avoid using bullet points, only use clear concise 1 to 2 sentences.`,
           },
           {
             role: "user",
@@ -283,6 +131,7 @@ app.post(
       });
 
       const summary = summaryResponse.choices[0].message.content;
+      console.log("Summary: " + summary);
 
       // Step 5: Text-to-speech
       const ttsResponse = await openai.audio.speech.create({
@@ -309,18 +158,17 @@ app.post(
   }
 );
 
-app.listen(3000, () => console.log("Server running on port 3000"));
+// Load SSL certificate and key
+// Replace with the actual paths to your certificate and key files
+const options = {
+  key: fs.readFileSync("../certs/172.20.10.2+3-key.pem"),
+  cert: fs.readFileSync("../certs/172.20.10.2+3.pem"),
+};
 
-function runYolo(command) {
-  return new Promise((resolve, reject) => {
-    exec(command, (error, stdout, stderr) => {
-      if (error) {
-        return reject(error);
-      }
-      if (stderr) {
-        console.warn("YOLO stderr:", stderr);
-      }
-      resolve(stdout); // return stdout
-    });
-  });
-}
+const PORT = 3000; // Use environment variable or default
+const HOST = "0.0.0.0"; // Listen on all network interfaces
+
+// Create HTTPS server instead of HTTP
+https.createServer(options, app).listen(PORT, HOST, () => {
+  console.log(`Server running securely on https://${HOST}:${PORT}`);
+});
