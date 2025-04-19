@@ -49,14 +49,33 @@ const RecordButton = ({ onRecordingComplete }: RecordButtonProps) => {
   return (
     <button
       onClick={toggleRecording}
-      className="fixed bottom-8 left-1/2 -translate-x-1/2 z-10 w-16 h-16 rounded-full bg-purple-500 hover:bg-purple-600 flex items-center justify-center shadow-lg transition-colors"
-      aria-label={isRecording ? 'Stop Recording' : 'Start Recording'}
+      className={`
+        fixed bottom-8 left-1/2 -translate-x-1/2 z-10 
+        w-16 h-16 rounded-full 
+        bg-purple-500 hover:bg-purple-600 
+        flex items-center justify-center 
+        shadow-lg transition-colors
+        ${isRecording ? "pulse-recording" : ""}
+      `}
+      aria-label={isRecording ? "Stop Recording" : "Start Recording"}
     >
-      {isRecording ? (
-        <MicOff className="w-8 h-8 text-white" />
-      ) : (
-        <Mic className="w-8 h-8 text-white" />
-      )}
+      {isRecording ? <Mic className="w-8 h-8 text-white" /> : <MicOff  className="w-8 h-8 text-white" />}
+      <style>{`
+        @keyframes pulse {
+          0% {
+            box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7);
+          }
+          70% {
+            box-shadow: 0 0 0 15px rgba(168, 85, 247, 0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(168, 85, 247, 0);
+          }
+        }
+        .pulse-recording {
+          animation: pulse 2s infinite;
+        }
+      `}</style>
     </button>
   );
 };
