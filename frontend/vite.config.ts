@@ -15,10 +15,10 @@ export default defineConfig({
     host: "0.0.0.0", // listen on all network interfaces
     https: {
       key: fs.readFileSync(
-        path.resolve(__dirname, "../certs/172.16.4.178+3-key.pem")
+        path.resolve(__dirname, "../certs/172.20.10.2+3-key.pem")
       ),
       cert: fs.readFileSync(
-        path.resolve(__dirname, "../certs/172.16.4.178+3.pem")
+        path.resolve(__dirname, "../certs/172.20.10.2+3.pem")
       ),
     },
   },
