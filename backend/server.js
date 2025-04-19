@@ -14,8 +14,13 @@ const __dirname = dirname(__filename);
 dotenv.config();
 const app = express();
 app.use(cors());
+
 const upload = multer();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Needed for Yolo: Spawns a shell and runes a command within that shell
+import { exec } from 'child_process';
+import path from "path"; 
 
 // Serve static files from the root directory
 app.use(express.static(__dirname));
@@ -219,7 +224,46 @@ app.post(
         ],
       });
 
+
       const imageDescription = imageResponse.choices[0].message.content;
+
+      //Step YOLO Process
+      const imagePath = join(__dirname, "uploads.png"); // temp image file path
+      fs.writeFileSync(imagePath, imageBuffer);
+      console.log("\nTHE IMAGE" + imagePath);
+      console.log("MIME" + req.files.image[0].mimetype  + '\n');
+      //const paths = path.toString; //relatuinve path
+      const yoloModel = path.join(__dirname, "yolov5", "detect.py"); //making the actual path
+      const command = `python  ${yoloModel} --save-txt --weights yolov5s.pt --source ${imagePath} --view-img`;
+      await runYolo(command)
+      let yoloResult = 'nothing';
+      //const yoloFile = '../yolov5/runs/detect/exp/labels/upload.txt';
+      const yoloFile = path.join(__dirname, "yolov5", "runs" ,"detect", "exp", "labels", "uploads.txt");
+      fs.readFile(yoloFile, 'utf8', (err, data) => {
+      if (err) {
+        console.error("Failed to read file:", err);
+        return;
+      }
+          yoloResult = data;
+          console.log("\n\n YOLO RESULT: " + yoloResult + "\n");
+        });
+      fs.unlinkSync(imagePath); //delete the image
+      const yoloFile2 = path.join(__dirname, "yolov5", "runs" ,"detect", "exp");
+      const deleteFolderRecursive = (folderPath) => {
+      if (fs.existsSync(folderPath)) {
+        fs.readdirSync(folderPath).forEach((file) => {
+          const curPath = path.join(folderPath, file);
+          if (fs.lstatSync(curPath).isDirectory()) {
+            deleteFolderRecursive(curPath); // recurse
+          } else {
+            fs.unlinkSync(curPath); // delete file
+          }
+        });
+        fs.rmdirSync(folderPath); // delete now-empty folder
+      }
+    };
+
+    deleteFolderRecursive(yoloFile2);
 
       // Step 4: Summarize combined information
       const combinedInput = `Audio transcript: ${transcript}\n\nImage description: ${imageDescription}`;
@@ -229,7 +273,7 @@ app.post(
         messages: [
           {
             role: "system",
-            content: `You are a helpful assistant designed specifically for a blind user. Your primary goal is to interpret audio and visual information to describe their immediate surroundings clearly, concisely, and accurately. Prioritize information crucial for awareness, orientation, and safety. Use simple, direct language. When applicable, provide directional cues relative to the user if inferrable.`,
+              content: `You are a helpful assistant designed specifically for a blind user. Your primary goal is to interpret audio and visual information to describe their immediate surroundings clearly, concisely, and accurately. Prioritize information crucial for awareness, orientation, and safety. Use simple, direct language. When applicable, provide directional cues relative to the user if inferrable.`,
           },
           {
             role: "user",
@@ -249,11 +293,12 @@ app.post(
       });
 
       const audioData = Buffer.from(await ttsResponse.arrayBuffer());
-
+      
       // Step 6: Return combined results
       res.json({
         summary: summary,
         audio: audioData.toString("base64"),
+        yoloResult: yoloResult,
       });
     } catch (error) {
       console.error("Master endpoint error:", error);
@@ -265,3 +310,17 @@ app.post(
 );
 
 app.listen(3000, () => console.log("Server running on port 3000"));
+
+function runYolo(command) {
+  return new Promise((resolve, reject) => {
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        return reject(error);
+      }
+      if (stderr) {
+        console.warn("YOLO stderr:", stderr);
+      }
+      resolve(stdout); // return stdout
+    });
+  });
+}
