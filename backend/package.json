@@ -1,23 +1,20 @@
 {
   "name": "backend",
   "version": "1.0.0",
+  "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "tsx --env-file .env --watch src/index.ts",
-    "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
   },
+  "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "type": "module",
   "dependencies": {
+    "dotenv": "^16.5.0",
     "express": "^5.1.0",
-    "typescript": "^5.8.3"
-  },
-  "devDependencies": {
-    "@tsconfig/node20": "^20.1.5",
-    "@types/express": "^5.0.1",
-    "@types/node": "^22.14.1",
-    "tsx": "^4.19.3"
+    "multer": "^1.4.5-lts.2",
+    "openai": "^4.95.0"
   }
 }

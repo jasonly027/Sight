@@ -87,4 +87,23 @@ app.post("/summarize", async (req, res) => {
   res.json({ summary: completion.choices[0].message.content });
 });
 
+app.use(express.json()); // parse JSON bodies
+
+app.post("/tts", async (req, res) => {
+  const { text } = req.body;
+
+  // 1. Call OpenAI TTS API
+  const ttsResponse = await openai.audio.speech.create({
+    model: "tts-1", // real‑time model :contentReference[oaicite:7]{index=7}
+    input: text,
+    voice: "alloy", // choose any supported voice
+    format: "mp3",
+  });
+
+  // 2. Stream MP3 back to client
+  res.set("Content-Type", "audio/mpeg");
+  const arrayBuffer = await ttsResponse.arrayBuffer();
+  res.send(Buffer.from(arrayBuffer));
+});
+
 app.listen(3000, () => console.log("Server running on port 3000"));
