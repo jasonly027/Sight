@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -12,13 +12,16 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.1.4",
     "axios": "^1.8.4",
+    "fs": "^0.0.1-security",
     "lucide-react": "^0.501.0",
+    "path": "^0.12.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwindcss": "^4.1.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
+    "@types/node": "^22.14.1",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react-swc": "^3.8.0",
@@ -28,6 +31,7 @@
     "globals": "^16.0.0",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.26.1",
-    "vite": "^6.3.1"
+    "vite": "^6.3.1",
+    "vite-plugin-mkcert": "^1.17.8"
   }
 }
