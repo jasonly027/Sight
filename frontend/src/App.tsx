@@ -6,6 +6,7 @@ import axios from "axios";
 export default function App() {
   const [response, setResponse] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [audioDataUrl, setAudioDataUrl] = useState<string | null>(null);
 
   const onCapture = (pictureBlob: Blob, audioBlob: Blob) => {
     setIsLoading(true);
@@ -21,18 +22,40 @@ export default function App() {
           "Content-Type": "multipart/form-data",
         },
       })
-      .then((resp) => console.log(resp));
-
-    setIsLoading(false);
+      .then((resp) => {
+        console.log(resp);
+        setResponse(resp.data.summary);
+        if (resp.data.audio) {
+          const audioUrl = `data:audio/mpeg;base64,${resp.data.audio}`;
+          setAudioDataUrl(audioUrl);
+        } else {
+          setAudioDataUrl(null);
+        }
+      })
+      .catch((err) => {
+        console.log(err);
+        setAudioDataUrl(null);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900">
       <Screen onCapture={onCapture} />
-      <ResponseBox
-        text={response}
-        isLoading={isLoading}
-      />
+      <ResponseBox text={response} isLoading={isLoading} />
+      {audioDataUrl && (
+        <audio
+          key={audioDataUrl}
+          autoPlay
+          controls
+          src={audioDataUrl}
+          className="hidden"
+        >
+          Your browser does not support the audio element.
+        </audio>
+      )}
     </div>
   );
 }

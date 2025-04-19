@@ -169,6 +169,7 @@ app.post(
           model: "whisper-1",
         });
         transcript = transcription.text;
+        console.log("Transcript: " + transcript);
         fs.unlinkSync(tempFilePath);
       } catch (audioError) {
         console.error("Audio transcription error:", audioError);
@@ -229,7 +230,7 @@ app.post(
         messages: [
           {
             role: "system",
-            content: `You are a helpful assistant designed specifically for a blind user. Your primary goal is to interpret audio and visual information to describe their immediate surroundings clearly, concisely, and accurately. Prioritize information crucial for awareness, orientation, and safety. Use simple, direct language. When applicable, provide directional cues relative to the user if inferrable.`,
+            content: `You are a helpful assistant designed specifically for a blind user. Your primary goal is to interpret audio and visual information to describe their immediate surroundings clearly, concisely, and accurately. Prioritize information crucial for awareness, orientation, and safety. Use simple, direct language. When applicable, provide directional cues relative to the user if inferrable. Avoid using bullet points, only use clear concise 1 to 2 sentences.`,
           },
           {
             role: "user",
@@ -239,6 +240,7 @@ app.post(
       });
 
       const summary = summaryResponse.choices[0].message.content;
+      console.log("Summary: " + summary);
 
       // Step 5: Text-to-speech
       const ttsResponse = await openai.audio.speech.create({
