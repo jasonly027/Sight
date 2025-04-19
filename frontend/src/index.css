@@ -1,1 +1,6 @@
 @import "tailwindcss";
+
+body {
+    background-color: #0f172b;
+    overscroll-behavior: none;
+}

@@ -1,22 +1,33 @@
 import { useEffect, useRef, useState } from "react";
+import useTakePicture from "../hooks/useTakePicture";
 
 export default function CameraView() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [error, setError] = useState<string>("");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const takePicture = useTakePicture(videoRef, canvasRef);
+
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     const startCamera = async () => {
+      if (!canvasRef.current || !videoRef.current) return;
+
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: "environment" },
           audio: false,
         });
 
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          if (!canvasRef.current || !videoRef.current) return;
+
+          canvasRef.current.width = videoRef.current.videoWidth;
+          canvasRef.current.height = videoRef.current.videoHeight;
+        };
       } catch (err) {
-        setError("Camera access denied. Please enable camera permissions.");
+        setError(true);
         console.error("Error accessing camera:", err);
       }
     };
@@ -30,18 +41,25 @@ export default function CameraView() {
   }, []);
 
   return (
-    <div className="relative w-full h-full">
+    <div className="w-full h-full">
       {error ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-900 text-white p-4 text-center">
-          {error}
+        <div className="flex items-center justify-center h-screen bg-slate-900 text-white p-4 text-center">
+          Camera access denied. Please enable camera permissions.
         </div>
       ) : (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          className="w-full h-full object-cover"
-        />
+        <>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            className="size-full"
+            onClick={takePicture}
+          />
+          <canvas
+            ref={canvasRef}
+            className="hidden"
+          ></canvas>
+        </>
       )}
     </div>
   );
