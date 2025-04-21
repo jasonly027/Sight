@@ -6,7 +6,7 @@
 
 <h4 align="center">Helping the visually impaired navigate real world environments</h4>
 
-<p>Use your phone's camera to scan your surroundings and receive real TTS environment analysis.</p>
+<p align="center">Use your phone's camera to scan your surroundings and receive real TTS environment analysis.</p>
 
 <h4 align="center">
     <a href="#preview"><b>Preview</b></a> •
