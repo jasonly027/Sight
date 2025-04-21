@@ -8,6 +8,8 @@ import * as dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import cors from "cors";
+import { exec } from "child_process";
+import path from "path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,6 +20,20 @@ app.use(cors());
 
 const upload = multer();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+function runYolo(command) {
+  return new Promise((resolve, reject) => {
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        return reject(error);
+      }
+      if (stderr) {
+        console.warn("YOLO stderr:", stderr);
+      }
+      resolve(stdout); // return stdout
+    });
+  });
+}
 
 // Function to transcribe audio
 async function transcribeAudio(audioBuffer) {
@@ -119,39 +135,47 @@ app.post(
       const imagePath = join(__dirname, "uploads.png"); // temp image file path
       fs.writeFileSync(imagePath, imageBuffer);
       console.log("\nTHE IMAGE" + imagePath);
-      console.log("MIME" + req.files.image[0].mimetype  + '\n');
+      console.log("MIME" + req.files.image[0].mimetype + "\n");
       //const paths = path.toString; //relatuinve path
       const yoloModel = path.join(__dirname, "yolov5", "detect.py"); //making the actual path
       const command = `python  ${yoloModel} --save-txt --weights yolov5s.pt --source ${imagePath} --view-img`;
-      await runYolo(command)
-      let yoloResult = 'nothing';
+      await runYolo(command);
+      let yoloResult = "nothing";
       //const yoloFile = '../yolov5/runs/detect/exp/labels/upload.txt';
-      const yoloFile = path.join(__dirname, "yolov5", "runs" ,"detect", "exp", "labels", "uploads.txt");
-      fs.readFile(yoloFile, 'utf8', (err, data) => {
-      if (err) {
-        console.error("Failed to read file:", err);
-        return;
-      }
-          yoloResult = data;
-          console.log("\n\n YOLO RESULT: " + yoloResult + "\n");
-        });
+      const yoloFile = path.join(
+        __dirname,
+        "yolov5",
+        "runs",
+        "detect",
+        "exp",
+        "labels",
+        "uploads.txt"
+      );
+      fs.readFile(yoloFile, "utf8", (err, data) => {
+        if (err) {
+          console.error("Failed to read file:", err);
+          return;
+        }
+        yoloResult = data;
+        console.log("\n\n YOLO RESULT: " + yoloResult + "\n");
+      });
       fs.unlinkSync(imagePath); //delete the image
-      const yoloFile2 = path.join(__dirname, "yolov5", "runs" ,"detect", "exp");
+      const yoloFile2 = path.join(__dirname, "yolov5", "runs", "detect", "exp");
       const deleteFolderRecursive = (folderPath) => {
-      if (fs.existsSync(folderPath)) {
-        fs.readdirSync(folderPath).forEach((file) => {
-          const curPath = path.join(folderPath, file);
-          if (fs.lstatSync(curPath).isDirectory()) {
-            deleteFolderRecursive(curPath); // recurse
-          } else {
-            fs.unlinkSync(curPath); // delete file
-          }
-        });
-        fs.rmdirSync(folderPath); // delete now-empty folder
-      }
-    };
+        if (fs.existsSync(folderPath)) {
+          fs.readdirSync(folderPath).forEach((file) => {
+            const curPath = path.join(folderPath, file);
+            if (fs.lstatSync(curPath).isDirectory()) {
+              deleteFolderRecursive(curPath); // recurse
+            } else {
+              fs.unlinkSync(curPath); // delete file
+            }
+          });
+          fs.rmdirSync(folderPath); // delete now-empty folder
+        }
+      };
 
-    deleteFolderRecursive(yoloFile2);
+      deleteFolderRecursive(yoloFile2);
 
       // Step 4: Generate summary based on transcript and image description
       const summaryResponse = await openai.chat.completions.create({
@@ -180,7 +204,7 @@ app.post(
       });
 
       const audioData = Buffer.from(await ttsResponse.arrayBuffer());
-      
+
       // Step 6: Return combined results
       res.json({
         summary: summary,
