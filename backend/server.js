@@ -17,8 +17,23 @@ const __dirname = dirname(__filename);
 dotenv.config();
 const app = express();
 app.use(cors());
+
 const upload = multer();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+function runYolo(command) {
+  return new Promise((resolve, reject) => {
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        return reject(error);
+      }
+      if (stderr) {
+        console.warn("YOLO stderr:", stderr);
+      }
+      resolve(stdout); // return stdout
+    });
+  });
+}
 
 // Function to transcribe audio
 async function transcribeAudio(audioBuffer) {
@@ -194,6 +209,7 @@ app.post(
       res.json({
         summary: summary,
         audio: audioData.toString("base64"),
+        yoloResult: yoloResult,
       });
     } catch (error) {
       console.error("Master endpoint error:", error);
